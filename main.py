@@ -673,7 +673,7 @@ while run:
                                         sys.exit(0)
                                 elif event.type == pygame.VIDEORESIZE:
                                         window = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
-                        
+
                         pygame.display.flip()
         escapeHeld = keys[pygame.K_ESCAPE]
 
@@ -722,7 +722,7 @@ while run:
         drawMessage()
         drawPinnedMessage()
         updateDelays()
-        
+
         pygame.display.update()
 pygame.quit()
 sys.exit(0)
