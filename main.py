@@ -334,7 +334,7 @@ class Chunk(object):
 
         sin_vals = (np.sin(x / 6000 + 10) + 0.1*np.sin(x / 2500) + np.sin(y / 900 + 2468) + 0.07*np.sin(y / 2500)) / 2.17 # between -1 and 1
 
-        np.random.seed(abs(x * y) % 100000000 )
+        np.random.seed((abs(x + (3*y+7)) + x + y + int(np.sin(y))*1000) % 2**31 )
 
         self.x = x
         self.y = y
@@ -375,154 +375,156 @@ class Chunk(object):
                         self.obs_list.append(Obstacle('planks.png', xx, yy, collidable=False))
                     else:
                         self.obs_list.append(Obstacle('water.png', xx, yy, collidable=False))
-                elif (bridge_X_sin_y > 0 and abs(bridge_X_sin_x) < 0.05) or (bridge_Y_sin_x > 0 and abs(bridge_Y_sin_y) < 0.05):
-                    self.obs_list.append(Obstacle('dirt.png', xx, yy, collidable=False))
-
-                    #branch out
-                    chance = np.random.randint(0, 10)
-                    direction = np.random.randint(0,4) #right left down up
-                    distance = np.random.randint(5,14)
-
-                    if chance < 1:
-                        if direction == 0:
-                            for num in range(0, distance):
-                                valid = True
-                                for obs in self.obs_list:
-                                    if obs.x == xx + 50*num and obs.y == yy:
-                                        valid = False
-                                if valid:
-                                    self.obs_list.append(Obstacle('dirt.png', xx + 50*num, yy, collidable=False))
-                            pot_house_spots.append((xx-250 + 50*num, yy-150))
-                            pot_chest_spots.append((xx+50 + 50*num, yy))
 
 
-
-                        if direction == 1:
-                            for num in range(0, distance):
-                                valid = True
-                                for obs in self.obs_list:
-                                    if obs.x == xx - 50*num and obs.y == yy:
-                                        valid = False
-                                if valid:
-                                    self.obs_list.append(Obstacle('dirt.png', xx - 50*num, yy, collidable=False))
-                            pot_house_spots.append((xx - 50*num, yy-150))
-                            pot_chest_spots.append((xx-50 - 50*num, yy))
-                            #self.obs_list.append(Obstacle('debugX.png', xx-50 - 50*num, yy, collidable=False))
-
-                        if direction == 2:
-                            for num in range(0, distance):
-                                valid = True
-                                for obs in self.obs_list:
-                                    if obs.x == xx and obs.y == yy + 50*num:
-                                        valid = False
-                                if valid:
-                                    self.obs_list.append(Obstacle('dirt.png', xx, yy + 50*num, collidable=False))
-                            pot_house_spots.append((xx+50, yy-100 + 50*num))
-                            pot_house_spots.append((xx-50, yy-100 + 50*num))
-                            pot_chest_spots.append((xx+50, yy + 50*num))
-                            pot_chest_spots.append((xx-50, yy + 50*num))
-                            # self.obs_list.append(Obstacle('debugX.png', xx+50, yy + 50*num, collidable=False))
-                            # self.obs_list.append(Obstacle('debugX.png', xx-50, yy + 50*num, collidable=False))
-
-                        if direction == 3:
-                            for num in range(0, distance):
-                                valid = True
-                                for obs in self.obs_list:
-                                    if obs.x == xx and obs.y == yy - 50*num:
-                                        valid = False
-                                if valid:
-                                    self.obs_list.append(Obstacle('dirt.png', xx, yy - 50*num, collidable=False))
-                            pot_house_spots.append((xx-100, yy-150 - 50*num))
-                            pot_chest_spots.append((xx, yy - 50*num-50))
-                            # self.obs_list.append(Obstacle('debugX.png', xx, yy - 50*num-50, collidable=False))
-
-
-
-
-        #Trees, fences, etc
-        # for i in range(0, np.random.randint(25,int(obstacle_frequency * 50) + 50)):
-        #     x = np.random.randint(0, 39)*50+self.x
-        #     y = np.random.randint(0, 39)*50+self.y
+        #
+        #
+        #
+        #
+        #
+        #
+        # # adding house
+        # for spot in pot_house_spots:
+        #     # if nothing is within spot[0] - spot[0]+250 and spot[1] - spot[1]+150
+        #     # make a house
         #     valid = True
-        #     for obs in self.obs_list:
-        #         if obs.x == x and obs.y == y:
+        #     if spot[0] > self.x + 1600 or spot[1] > self.y + 1600:
+        #         valid = False
+        #     else:
+        #         for obj in self.obs_list:
+        #             if obj.x >= spot[0] and obj.x < spot[0]+250 and obj.y >= spot[1] and obj.y < spot[1]+150:
+        #                 valid = False
+        #     if valid:
+        #         self.obs_list.append(Obstacle('tree_1.png', spot[0]+100, spot[1]+100, collidable=False, x_size=50, y_size=50))
+        #         self.obs_list.append(Obstacle('tree_1.png', spot[0], spot[1]+100, collidable=False, x_size=50, y_size=50))
+        #         self.obs_list.append(Obstacle('tree_1.png', spot[0]+200, spot[1]+100, collidable=False, x_size=50, y_size=50))
+        #         self.obs_list.append(Obstacle('cabin2.png', spot[0], spot[1], collidable=False, x_size=250, y_size=150))
+        #
+        # #adding chest or npc
+        # for spot in pot_chest_spots:
+        #     valid = True
+        #     for obj in self.obs_list:
+        #         if obj.x == spot[0] and obj.y == spot[1]:
         #             valid = False
         #     if valid:
-        #         rando = np.random.uniform(0, self.vege+1)
-        #         if rando > .65:
-        #             self.obs_list.append(Obstacle('tree_1.png', x, y, collidable=False))
-        #         else:
-        #             self.obs_list.append(Obstacle('fence_1.png', x, y, collidable=False))
+        #         choice = np.random.choice([0, 1],1,p=[0.5,0.5])[0]
+        #         chest_type = np.random.choice(['chest.png', 'barrel.png'],1,p=[0.5,0.5])[0]
+        #         npc_type = np.random.choice(['knight.png', 'enemy_knight.png'],1,p=[0.5,0.5])[0]
+        #
+        #         if choice == 0:
+        #             self.obs_list.append(Obstacle(chest_type, spot[0], spot[1], collidable=False, x_size=50, y_size=50, onpickup_item=np.random.choice(itemList,1)[0]))
+        #         if choice == 1:
+        #             if npc_type == 'knight.png':
+        #                 npcs.append(Npc(npc_type, spot[0]+offset[0], spot[1]+offset[1], 'I want some water', '', 'Ethan'))
+        #             else:
+        #                 npcs.append(Npc(npc_type, spot[0]+offset[0], spot[1]+offset[1], 'Can I have a gold coin, please?', '', 'Ethan'))
+        #
+        #
+        # for xx in range(self.x, self.x+2000, 50):
+            # for yy in range(self.y, self.y+2000, 50):
+            #     forest_sin_x = (np.sin(xx / 100) +     2*np.sin(xx / 200 + 17)  +  4*np.sin(xx / 500 + 7)    )/7
+            #     forest_sin_y = (np.sin(yy / 150 + 5) + 2*np.sin(yy / 158 + 127) +  4*np.sin(yy / 450 + 77)   )/7
+            #     if abs(forest_sin_x + forest_sin_y) > 1.3:
+            #         can_add_tree = True
+            #         for obj in self.obs_list:
+            #             if obj.x == xx and obj.y == yy:
+            #                 can_add_tree = False
+            #         for npc in npcs:
+            #             if npc.x == xx and npc.y == yy:
+            #                 can_add_tree = False
+            #         if can_add_tree:
+            #             self.obs_list.append(Obstacle('tree_1.png', xx, yy, collidable=False))
 
-        # adding house
-        for spot in pot_house_spots:
-            # if nothing is within spot[0] - spot[0]+250 and spot[1] - spot[1]+150
-            # make a house
-            valid = True
-            if spot[0] > self.x + 1600 or spot[1] > self.y + 1600:
-                valid = False
-            else:
-                for obj in self.obs_list:
-                    if obj.x >= spot[0] and obj.x < spot[0]+250 and obj.y >= spot[1] and obj.y < spot[1]+150:
-                        valid = False
-            if valid:
-                self.obs_list.append(Obstacle('tree_1.png', spot[0]+100, spot[1]+100, collidable=False, x_size=50, y_size=50))
-                self.obs_list.append(Obstacle('tree_1.png', spot[0], spot[1]+100, collidable=False, x_size=50, y_size=50))
-                self.obs_list.append(Obstacle('tree_1.png', spot[0]+200, spot[1]+100, collidable=False, x_size=50, y_size=50))
-                self.obs_list.append(Obstacle('cabin2.png', spot[0], spot[1], collidable=False, x_size=250, y_size=150))
 
-        #adding chest or npc
-        for spot in pot_chest_spots:
-            valid = True
+        def is_clear(top_left, bottom_right):
+            clear = top_left[0] >= self.x and top_left[1] >= self.y and bottom_right[0] <= self.x+2000 and bottom_right[1] <= self.y + 2000
             for obj in self.obs_list:
-                if obj.x == spot[0] and obj.y == spot[1]:
-                    valid = False
-            if valid:
-                choice = np.random.choice([0, 1],1,p=[0.5,0.5])[0]
-                chest_type = np.random.choice(['chest.png', 'barrel.png'],1,p=[0.5,0.5])[0]
-                npc_type = np.random.choice(['knight.png', 'enemy_knight.png'],1,p=[0.5,0.5])[0]
+                if  obj.x >= top_left[0] and obj.x < bottom_right[0] and obj.y >= top_left[1] and obj.y < bottom_right[1]:
+                    return False
+            return clear
 
-                if choice == 0:
-                    self.obs_list.append(Obstacle(chest_type, spot[0], spot[1], collidable=False, x_size=50, y_size=50, onpickup_item=np.random.choice(itemList,1)[0]))
-                if choice == 1:
-                    if npc_type == 'knight.png':
-                        npcs.append(Npc(npc_type, spot[0]+offset[0], spot[1]+offset[1], 'I want some water', '', 'Ethan'))
-                    else:
-                        npcs.append(Npc(npc_type, spot[0]+offset[0], spot[1]+offset[1], 'Can I have a gold coin, please?', '', 'Ethan'))
+        def house_spot_valid(target_spot):
+            top_left = [target_spot[0]-50, target_spot[1]-50]
+            bottom_right = [target_spot[0]+300, target_spot[1]+200]
+
+            contains_a_road = False
+            for obj in self.obs_list:
+                if  obj.x >= top_left[0] and obj.x < bottom_right[0] and obj.y >= top_left[1] and obj.y < bottom_right[1] and obj.image_name == "dirt.png":
+                    contains_a_road = True
+                    break
+            return is_clear([top_left[0]+50, top_left[1]+50], [bottom_right[0]-50, bottom_right[1]-50]) and contains_a_road
+
+        def create_road(start, direction, length):
+            if length < 5:
+                return False
+            if direction == 0:# left
+                top_left = [start[0]-(length+1)*50, start[1]-50]
+                bottom_right = [start[0]-50, start[1]+50]
+                if is_clear(top_left, bottom_right):
+                    for l in range(1,length+1):
+                        self.obs_list.append(Obstacle('dirt.png', start[0]-l*50, start[1], collidable=False))
+                    for i in range(5):
+                        random_start = [np.random.choice(range(start[0]-50,start[0] - length*50,-50),1)[0],
+                                        start[1]]
+                        random_length = np.random.choice(range(length-5, length-2),1)[0]
+                        random_dir = np.random.choice([2,3],1)[0]
+                        create_road(random_start, random_dir, random_length)
+            if direction == 1:# right
+                top_left = [start[0]+50, start[1]-50]
+                bottom_right = [start[0]+(length+1)*50, start[1]+50]
+                if is_clear(top_left, bottom_right):
+                    for l in range(1,length+1):
+                        self.obs_list.append(Obstacle('dirt.png', start[0]+l*50, start[1], collidable=False))
+                    for i in range(5):
+                        random_start = [np.random.choice(range(start[0]+50,start[0] + length*50,50),1)[0],
+                                        start[1]]
+                        random_length = np.random.choice(range(length-5, length-2),1)[0]
+                        random_dir = np.random.choice([2,3],1)[0]
+                        create_road(random_start, random_dir, random_length)
+            if direction == 2:# up
+                top_left = [start[0]-50, start[1]-(length+1)*50]
+                bottom_right = [start[0]+50, start[1]-50]
+                if is_clear(top_left, bottom_right):
+                    for l in range(1,length+1):
+                        self.obs_list.append(Obstacle('dirt.png', start[0], start[1]-l*50, collidable=False))
+                    for i in range(5):
+                        random_start = [start[0],
+                                        np.random.choice(range(start[1]-50,start[1] - length*50,-50),1)[0]]
+                        random_length = np.random.choice(range(length-5, length-2),1)[0]
+                        random_dir = np.random.choice([0,1],1)[0]
+                        create_road(random_start, random_dir, random_length)
+            if direction == 3:# down
+                top_left = [start[0]-50, start[1]-50]
+                bottom_right = [start[0]+50, start[1]+(length+1)*50]
+                if is_clear(top_left, bottom_right):
+                    for l in range(1,length+1):
+                        self.obs_list.append(Obstacle('dirt.png', start[0], start[1]+l*50, collidable=False))
+                    for i in range(5):
+                        random_start = [start[0],
+                                        np.random.choice(range(start[1]+50,start[1] + length*50,50),1)[0]]
+                        random_length = np.random.choice(range(length-5, length-2),1)[0]
+                        random_dir = np.random.choice([0,1],1)[0]
+                        create_road(random_start, random_dir, random_length)
+
+
+
+
+        create_road([self.x+50*(np.random.randint(40)), self.y+50*(np.random.randint(40))], np.random.randint(4), np.random.randint(20,30))
 
 
         for xx in range(self.x, self.x+2000, 50):
             for yy in range(self.y, self.y+2000, 50):
-                forest_sin_x = (np.sin(xx / 100) +     2*np.sin(xx / 200 + 17)  +  4*np.sin(xx / 500 + 7)    )/7
-                forest_sin_y = (np.sin(yy / 150 + 5) + 2*np.sin(yy / 158 + 127) +  4*np.sin(yy / 450 + 77)   )/7
-                if abs(forest_sin_x + forest_sin_y) > 1.3:
-                    can_add_tree = True
-                    for obj in self.obs_list:
-                        if obj.x == xx and obj.y == yy:
-                            can_add_tree = False
-                    for npc in npcs:
-                        if npc.x == xx and npc.y == yy:
-                            can_add_tree = False
-                    if can_add_tree:
-                        self.obs_list.append(Obstacle('tree_1.png', xx, yy, collidable=False))
-
-        def is_clear(top_left, bottom_right): # [inclusive, exclusive)
-            clear = True
-            for obj in self.obs_list:
-                if  obj.x >= top_left[0] and obj.x < bottom_right[0]
-                and obj.y >= top_left[1] and obj.y < bottom_right[1]:
-                    clear = False
-            return clear
-
-        def create_road(start, direction, length):
-            if direction == 0:# left
-                top_left = (start)
-
+                if house_spot_valid([xx, yy]):
+                    self.obs_list.append(Obstacle('cabin2.png', xx, yy, collidable=False, x_size=250, y_size=150))
+                    for xoff in range(0, 5):
+                        for yoff in range(0,3):
+                            self.obs_list.append(Obstacle('nothing.png', xx+xoff*(50), yy+yoff*50, collidable=False))
 
     def draw(self, window, offset):
         pygame.draw.rect(window, self.rgb, (self.x+offset[0], self.y+offset[1], 2000, 2000))
         for obs in self.obs_list:
                 window.blit(obs.image, (obs.x+offset[0], obs.y+offset[1]))
+
 
 
 class COC(object):
