@@ -1,11 +1,89 @@
 import pygame
 import time
 import sys
+import numpy as np
 from googletrans import Translator
+import json
 
+languages = ['en', 'es', 'ru','fr', 'de', 'ar', 'tr', 'zu']
+language_names = ['English', 'Spanish', 'Russian', 'French', 'German', 'Arabic', 'Turkish', 'Zulu']
+language = languages[0]
+print(languages[0])
+#print(translate(languages[0]))
 
-language = 'en'
 translator = Translator()
+print(translator.translate('Hello', dest='es').text)
+
+offset = [775,475]
+
+f = open("translations.json", encoding='utf-8')
+all_translated_text = json.load(f)
+f.close()
+def translate(text):
+    key = text + language
+    if key not in all_translated_text.keys():
+        all_translated_text[key] = translator.translate(text, dest=language).text
+        print("unable to translate", key, "defaulting to google, got", all_translated_text[key])
+    # if language == "ar":
+    #     print(all_translated_text[key])
+    return all_translated_text[key]
+
+for lang in language_names:
+    lang = translate(lang)
+
+
+
+
+
+
+
+class Obstacle(object):
+        """docstring for Obstacle"""
+        def __init__(self, image_name, x, y, onpickup_item=None, collidable=True, x_size=50, y_size=50):
+                super(Obstacle, self).__init__()
+
+                self.x = x
+                self.y = y
+                self.x_size = x_size
+                self.y_size = y_size
+
+                self.image = pygame.image.load(image_name).convert_alpha()
+                self.image = pygame.transform.scale(self.image, (self.x_size, self.y_size))
+
+                self.collidable  = collidable
+                self.onpickup_item = onpickup_item
+                self.image_name = image_name
+                if onpickup_item != None:
+                        self.message = translate("You found a " + onpickup_item.name + ".")
+                else:
+                        self.message = translate('You found nothing.')
+
+
+        def interact(self):
+                item_to_give = self.onpickup_item
+                self.onpickup_item = None
+                self.message = translate('You found nothing.')
+                return item_to_give
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # if the bot is within range of player
@@ -25,6 +103,8 @@ translator = Translator()
 window = pygame.display.set_mode((1600, 1000), pygame.RESIZABLE)
 pygame.display.set_caption('Loading...')
 
+
+
 class Mob(object):
         """docstring for Mob"""
         def __init__(self, image_name, x, y, name):
@@ -34,73 +114,65 @@ class Mob(object):
                 self.x = x
                 self.y = y
                 self.name = name
+                self.goal = None
+
+                self.last_attacked_time = 0
 
         def move(self):
                 # print(CheckDistance((hero.x, hero.y), (self.x, self.y)))
                 dist_to_player = CheckDistance((hero.x, hero.y), (self.x, self.y))
+                if dist_to_player < 20 and time.time() - self.last_attacked_time > 1:
+                    self.last_attacked_time = time.time()
+                    print("ATTACKING")
+                    hero.change_health(-10)
+                    miscSound1.play()
+
+
                 if dist_to_player < 1000 and dist_to_player > 20: #TODO: play w this
-                        for obs in obstacles:
-                                if CheckDistance((obs.x, obs.y), (self.x, self.y)) < 1000:
+                        can_update_goal = True
+                        for obs in world.get_obstacles():
+                                if CheckDistance((obs.x+offset[0], obs.y+offset[1]), (self.x, self.y)) < 1000:
 #                                       if parity x diff between obs and self is not parity of x diff between self and player
 #
-                                        parity_x_o_s = obs.x > self.x
-                                        parity_x_h_s = hero.x > self.x
-                                        parity_y_o_s = obs.y > self.y
-                                        parity_y_h_s = hero.y > self.y
+                                        parity_x_o_s = obs.x+offset[0] > self.x
+                                        parity_x_h_s = hero.x> self.x
+                                        parity_y_o_s = obs.y+offset[1] > self.y
+                                        parity_y_h_s = hero.y> self.y
                                         parity_check_good = (parity_x_o_s == parity_x_h_s) and (parity_y_o_s == parity_y_h_s)
 #
 #
 #
-                                        if parity_check_good and CheckDistance((hero.x, hero.y), (self.x, self.y)) > CheckDistance((obs.x, obs.y), (self.x, self.y)):
-                                                d = abs((hero.x - self.x)*(self.y - obs.y) - (self.x - obs.x)*(hero.y - self.y)) / CheckDistance((hero.x, hero.y), (self.x, self.y))
-                                                if d < 25:
-                                                        # print("collision detected", obs.image_name)
-                                                        pygame.draw.line(window, (255,0,0), (self.x, self.y), (obs.x, obs.y), 2)
-                                                        return False
-                        total = abs(hero.x - self.x) + abs(hero.y - self.y)
-                        self.x += (hero.x - self.x) / total
-                        self.y += (hero.y - self.y) / total
+                                        if parity_check_good and CheckDistance((hero.x, hero.y), (self.x, self.y)) > CheckDistance((obs.x+offset[0], obs.y+offset[1]), (self.x, self.y)):
+                                                d = abs((hero.x - self.x)*(self.y - obs.y-offset[1]) - (self.x - obs.x-offset[0])*(hero.y - self.y)) / CheckDistance((hero.x, hero.y), (self.x, self.y))
+                                                if d < 50:
+                                                        can_update_goal = False
+                        if can_update_goal:
+                            self.goal = [hero.x, hero.y]
+                if self.goal is not None and CheckDistance(self.goal, (self.x, self.y)) > 1:
+                    total = abs(self.goal[0] - self.x) + abs(self.goal[1] - self.y)
+                    self.x += 0.9* (self.goal[0] - self.x) / total
+                    self.y += 0.9* (self.goal[1] - self.y) / total
+                else:
+                    self.goal = None
+                    return False
 
 
 class Npc(object):
         """docstring for Npc"""
         def __init__(self, image_name, x, y, message_1, message_2, name):
                 super(Npc, self).__init__()
+                self.image_name = image_name
                 self.image = pygame.image.load(image_name).convert_alpha()
                 self.image = pygame.transform.scale(self.image, (50, 50))
                 self.x = x
                 self.y = y
-                self.message_1 = message_1
-                self.message_2 = message_2
-                self.message_3 = "Quest not yet completed."
-                self.name = name
+                self.message_1 = translate(message_1)
+                self.message_2 = translate(message_2)
+                self.message_3 = translate("Quest not yet completed.")
+                self.name = translate(name)
 
         def complete_quest(self):
-                self.message_3 = "Quest completed!"
-
-LEVEL_UP_MESSAGE = translator.translate("Level up!", dest=language).text
-FOUND_NOTHING_MESSAGE = translator.translate("You found nothing.", dest=language).text
-class Obstacle(object):
-        """docstring for Obstacle"""
-        def __init__(self, image_name, x, y, onpickup_item=None):
-                super(Obstacle, self).__init__()
-                self.image = pygame.image.load(image_name).convert_alpha()
-                self.image = pygame.transform.scale(self.image, (50, 50))
-                self.x = x
-                self.y = y
-                self.onpickup_item = onpickup_item
-                self.image_name = image_name
-                if onpickup_item != None:
-                        self.message = "You found a " + onpickup_item.name + "."
-                else:
-                        self.message = FOUND_NOTHING_MESSAGE
-
-
-        def interact(self):
-                item_to_give = self.onpickup_item
-                self.onpickup_item = None
-                self.message = FOUND_NOTHING_MESSAGE
-                return item_to_give
+                self.message_3 = translate("Quest completed!")
 
 
 class Player(object):
@@ -111,14 +183,11 @@ class Player(object):
                 self.image = pygame.transform.scale(self.image, (50, 50))
                 self.x = 775
                 self.y = 475
-                self.vel = 1
+                self.vel = 10 ###SET TO 1 FOR REAL GAMEPLAY
                 self.xp = 0
                 self.health = 100
                 self.mana = 100
                 self.level = 1
-                self.health_text = 'Health: ' + str(self.health) + '/100'
-                self.mana_text = 'Mana: ' + str(self.mana) + '/100'
-                self.xp_text = 'XP: ' + str(self.xp) + '/' + str(100 + ((self.level-1) * 25))
 
         def add_xp(self, amount):
                 amount_to_next_level = 100 + ((self.level-1) * 25)
@@ -127,7 +196,7 @@ class Player(object):
                 if self.xp >= amount_to_next_level:
                         self.level += 1
                         self.add_xp(amount - amount_to_next_level)
-                        pinMessage(LEVEL_UP_MESSAGE)
+                        pinMessage(translate('Level up!'))
 
         def change_health(self, amount):
                 self.health += amount
@@ -173,18 +242,30 @@ global isSaved
 global isLoaded
 global hero
 hero = Player()
-mob = Mob('water_bucket.png', 700, 700, 'Buckethead')
+mob = Mob('goblin.png', 700, 700, 'Buckethead')
 pygame.init()
 pygame.font.init()
 
 
 #FONTS
 
-font_inv = pygame.font.SysFont('georgia', 50)
-font_inv_small = pygame.font.SysFont('georgia', 15)
-font_message = pygame.font.SysFont('georgia', 35)
-debugFont = pygame.font.SysFont('arial', 12)
-font_questbox = pygame.font.SysFont('georgia', 20)
+font_inv_english = pygame.font.SysFont('georgia', 50)
+font_inv_small_english = pygame.font.SysFont('georgia', 15)
+font_message_english = pygame.font.SysFont('georgia', 35)
+debugFont_english = pygame.font.SysFont('arial', 12)
+font_questbox_english = pygame.font.SysFont('georgia', 20)
+
+font_inv_arabic = pygame.font.Font('NotoNaskhArabic-Regular.ttf', 50)
+font_inv_small_arabic = pygame.font.Font('NotoNaskhArabic-Regular.ttf', 15)
+font_message_arabic = pygame.font.Font('NotoNaskhArabic-Regular.ttf', 35)
+debugFont_arabic = pygame.font.Font('NotoNaskhArabic-Regular.ttf', 12)
+font_questbox_arabic = pygame.font.Font('NotoNaskhArabic-Regular.ttf', 20)
+
+font_inv = font_inv_english
+font_inv_small = font_inv_small_english
+font_message = font_message_english
+debugFont = debugFont_english
+font_questbox = font_questbox_english
 
 #print(pygame.font.get_fonts()) #print all fonts
 
@@ -205,8 +286,8 @@ invPositions = invPositionsScaled
 
 #List of NPCs
 npcs = [
-        Npc('npc_1.png', 400, 550, 'I would like some water, please.', '', 'Ethan'),
-        Npc('npc_1.png', 600, 550, 'Give me a scroll', '', 'Devin')
+        Npc('npc_1.png', 400, 550, translate('I would like some water, please.'), '', 'Ethan'),
+        Npc('npc_1.png', 600, 550, translate('Give me a scroll'), '', 'Devin')
         ]
 
 
@@ -214,17 +295,331 @@ npcs = [
 
 #list of all items
 itemList = []
-item_debugX = Item('debugX.png', 'Poggers')
-item_key = Item('key.png', 'Key')
-item_scroll = Item('scroll.png', 'Scroll')
-item_water_bucket = Item('water_bucket.png', 'Water Bucket')
-itemList = [item_debugX, item_key, item_scroll, item_water_bucket]
+item_debugX = Item('debugX.png', translate('Poggers'))
+item_key = Item('key.png', translate('Key'))
+item_scroll = Item('scroll.png', translate('Scroll'))
+item_water_bucket = Item('water_bucket.png', translate('Water Bucket'))
+item_gold_coin = Item('gold_coin.png', translate('Gold Coin'))
+item_gold_bar = Item('gold_bar.png', translate('Gold Bar'))
+
+
+
+itemList = [item_debugX, item_key, item_scroll, item_water_bucket, item_gold_coin, item_gold_bar]
 inventoryList = [item_water_bucket, item_scroll, item_debugX]
 #\/  stop deleting this  \/
 #for x in range(0, 10):
         #inventoryList.append(item_debugX)
 
 #array of all the non-player obstacles and static stuff on the screen
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class Chunk(object):
+    """docstring for Chunk."""
+
+    def __init__(self, x, y):
+        super(Chunk, self).__init__()
+        # np.random.seed(str(x) + "---" + str(y))
+
+        sin_vals = (np.sin(x / 6000 + 10) + 0.1*np.sin(x / 2500) + np.sin(y / 900 + 2468) + 0.07*np.sin(y / 2500)) / 2.17 # between -1 and 1
+
+        np.random.seed(abs(x * y) % 100000000 )
+
+        self.x = x
+        self.y = y
+
+
+        #VARIATIONS
+
+        self.rgb = (128 + 100*sin_vals, 0,0)
+        self.vege = sin_vals
+        if self.vege > .5:
+            self.rgb = (0, 255, 0)
+        elif self.vege > -0.5:
+            self.rgb = (210, 180, 140)
+        else:
+            self.rgb = (192, 192, 192)
+
+        obstacle_frequency = self.vege + 1
+
+        self.obs_list = []
+        pot_house_spots = []
+        pot_chest_spots = []
+        pot_npc_spots = []
+        #Roads, rivers, and bridges, etc
+        for xx in range(self.x, self.x+2000, 50):
+            for yy in range(self.y, self.y+2000, 50):
+                river_sin_x = (np.sin(xx / 600) +     2*np.sin(xx / 1000 + 17)  +  4*np.sin(xx / 2300 + 7)    )/7
+                river_sin_y = (np.sin(yy / 500 + 5) + 2*np.sin(yy / 1200 + 127) +  4*np.sin(yy / 2100 + 77)   )/7
+
+                bridge_X_sin_x = (np.sin(xx / 300) +     2*np.sin(xx / 500 + 47)  +  4*np.sin(xx / 1200 + 37)    )/7
+                bridge_X_sin_y = (np.sin(yy / 600 + 19) + 2*np.sin(yy / 1200 + 17) +  4*np.sin(yy / 1800 + 777)   )/7
+                bridge_Y_sin_x = (np.sin(xx / 600 + 139) + 2*np.sin(xx / 1210 + 171) +  4*np.sin(xx / 1700 + 773)   )/7
+                bridge_Y_sin_y = (np.sin(yy / 391 + 17) +     2*np.sin(yy / 501 + 437)  +  4*np.sin(yy / 1400 + 37)    )/7
+
+
+                river_comb = river_sin_x + river_sin_y
+                if abs(river_comb) < 0.05:
+                    if (bridge_X_sin_y > 0 and abs(bridge_X_sin_x) < 0.05) or (bridge_Y_sin_x > 0 and abs(bridge_Y_sin_y) < 0.05):
+                        self.obs_list.append(Obstacle('planks.png', xx, yy, collidable=False))
+                    else:
+                        self.obs_list.append(Obstacle('water.png', xx, yy, collidable=False))
+                elif (bridge_X_sin_y > 0 and abs(bridge_X_sin_x) < 0.05) or (bridge_Y_sin_x > 0 and abs(bridge_Y_sin_y) < 0.05):
+                    self.obs_list.append(Obstacle('dirt.png', xx, yy, collidable=False))
+
+                    #branch out
+                    chance = np.random.randint(0, 10)
+                    direction = np.random.randint(0,4) #right left down up
+                    distance = np.random.randint(5,14)
+
+                    if chance < 1:
+                        if direction == 0:
+                            for num in range(0, distance):
+                                valid = True
+                                for obs in self.obs_list:
+                                    if obs.x == xx + 50*num and obs.y == yy:
+                                        valid = False
+                                if valid:
+                                    self.obs_list.append(Obstacle('dirt.png', xx + 50*num, yy, collidable=False))
+                            pot_house_spots.append((xx-250 + 50*num, yy-150))
+                            pot_chest_spots.append((xx+50 + 50*num, yy))
+
+
+
+                        if direction == 1:
+                            for num in range(0, distance):
+                                valid = True
+                                for obs in self.obs_list:
+                                    if obs.x == xx - 50*num and obs.y == yy:
+                                        valid = False
+                                if valid:
+                                    self.obs_list.append(Obstacle('dirt.png', xx - 50*num, yy, collidable=False))
+                            pot_house_spots.append((xx - 50*num, yy-150))
+                            pot_chest_spots.append((xx-50 - 50*num, yy))
+                            #self.obs_list.append(Obstacle('debugX.png', xx-50 - 50*num, yy, collidable=False))
+
+                        if direction == 2:
+                            for num in range(0, distance):
+                                valid = True
+                                for obs in self.obs_list:
+                                    if obs.x == xx and obs.y == yy + 50*num:
+                                        valid = False
+                                if valid:
+                                    self.obs_list.append(Obstacle('dirt.png', xx, yy + 50*num, collidable=False))
+                            pot_house_spots.append((xx+50, yy-100 + 50*num))
+                            pot_house_spots.append((xx-50, yy-100 + 50*num))
+                            pot_chest_spots.append((xx+50, yy + 50*num))
+                            pot_chest_spots.append((xx-50, yy + 50*num))
+                            # self.obs_list.append(Obstacle('debugX.png', xx+50, yy + 50*num, collidable=False))
+                            # self.obs_list.append(Obstacle('debugX.png', xx-50, yy + 50*num, collidable=False))
+
+                        if direction == 3:
+                            for num in range(0, distance):
+                                valid = True
+                                for obs in self.obs_list:
+                                    if obs.x == xx and obs.y == yy - 50*num:
+                                        valid = False
+                                if valid:
+                                    self.obs_list.append(Obstacle('dirt.png', xx, yy - 50*num, collidable=False))
+                            pot_house_spots.append((xx-100, yy-150 - 50*num))
+                            pot_chest_spots.append((xx, yy - 50*num-50))
+                            # self.obs_list.append(Obstacle('debugX.png', xx, yy - 50*num-50, collidable=False))
+
+
+
+
+        #Trees, fences, etc
+        # for i in range(0, np.random.randint(25,int(obstacle_frequency * 50) + 50)):
+        #     x = np.random.randint(0, 39)*50+self.x
+        #     y = np.random.randint(0, 39)*50+self.y
+        #     valid = True
+        #     for obs in self.obs_list:
+        #         if obs.x == x and obs.y == y:
+        #             valid = False
+        #     if valid:
+        #         rando = np.random.uniform(0, self.vege+1)
+        #         if rando > .65:
+        #             self.obs_list.append(Obstacle('tree_1.png', x, y, collidable=False))
+        #         else:
+        #             self.obs_list.append(Obstacle('fence_1.png', x, y, collidable=False))
+
+        # adding house
+        for spot in pot_house_spots:
+            # if nothing is within spot[0] - spot[0]+250 and spot[1] - spot[1]+150
+            # make a house
+            valid = True
+            if spot[0] > self.x + 1600 or spot[1] > self.y + 1600:
+                valid = False
+            else:
+                for obj in self.obs_list:
+                    if obj.x >= spot[0] and obj.x < spot[0]+250 and obj.y >= spot[1] and obj.y < spot[1]+150:
+                        valid = False
+            if valid:
+                self.obs_list.append(Obstacle('tree_1.png', spot[0]+100, spot[1]+100, collidable=False, x_size=50, y_size=50))
+                self.obs_list.append(Obstacle('tree_1.png', spot[0], spot[1]+100, collidable=False, x_size=50, y_size=50))
+                self.obs_list.append(Obstacle('tree_1.png', spot[0]+200, spot[1]+100, collidable=False, x_size=50, y_size=50))
+                self.obs_list.append(Obstacle('cabin2.png', spot[0], spot[1], collidable=False, x_size=250, y_size=150))
+
+        #adding chest or npc
+        for spot in pot_chest_spots:
+            valid = True
+            for obj in self.obs_list:
+                if obj.x == spot[0] and obj.y == spot[1]:
+                    valid = False
+            if valid:
+                choice = np.random.choice([0, 1],1,p=[0.5,0.5])[0]
+                chest_type = np.random.choice(['chest.png', 'barrel.png'],1,p=[0.5,0.5])[0]
+                npc_type = np.random.choice(['knight.png', 'enemy_knight.png'],1,p=[0.5,0.5])[0]
+
+                if choice == 0:
+                    self.obs_list.append(Obstacle(chest_type, spot[0], spot[1], collidable=False, x_size=50, y_size=50, onpickup_item=np.random.choice(itemList,1)[0]))
+                if choice == 1:
+                    if npc_type == 'knight.png':
+                        npcs.append(Npc(npc_type, spot[0]+offset[0], spot[1]+offset[1], 'I want some water', '', 'Ethan'))
+                    else:
+                        npcs.append(Npc(npc_type, spot[0]+offset[0], spot[1]+offset[1], 'Can I have a gold coin, please?', '', 'Ethan'))
+
+
+        for xx in range(self.x, self.x+2000, 50):
+            for yy in range(self.y, self.y+2000, 50):
+                forest_sin_x = (np.sin(xx / 100) +     2*np.sin(xx / 200 + 17)  +  4*np.sin(xx / 500 + 7)    )/7
+                forest_sin_y = (np.sin(yy / 150 + 5) + 2*np.sin(yy / 158 + 127) +  4*np.sin(yy / 450 + 77)   )/7
+                if abs(forest_sin_x + forest_sin_y) > 1.3:
+                    can_add_tree = True
+                    for obj in self.obs_list:
+                        if obj.x == xx and obj.y == yy:
+                            can_add_tree = False
+                    for npc in npcs:
+                        if npc.x == xx and npc.y == yy:
+                            can_add_tree = False
+                    if can_add_tree:
+                        self.obs_list.append(Obstacle('tree_1.png', xx, yy, collidable=False))
+
+        def is_clear(top_left, bottom_right): # [inclusive, exclusive)
+            clear = True
+            for obj in self.obs_list:
+                if  obj.x >= top_left[0] and obj.x < bottom_right[0]
+                and obj.y >= top_left[1] and obj.y < bottom_right[1]:
+                    clear = False
+            return clear
+
+        def create_road(start, direction, length):
+            if direction == 0:# left
+                top_left = (start)
+
+
+    def draw(self, window, offset):
+        pygame.draw.rect(window, self.rgb, (self.x+offset[0], self.y+offset[1], 2000, 2000))
+        for obs in self.obs_list:
+                window.blit(obs.image, (obs.x+offset[0], obs.y+offset[1]))
+
+
+class COC(object):
+    """docstring for COC."""
+
+    def __init__(self, x, y):
+        super(COC, self).__init__()
+        self.chunks_list = [
+            [ Chunk(-2000,-2000), Chunk(0,-2000)],
+            [ Chunk(-2000, 0) , Chunk(0,0)],
+        ]
+
+    def draw(self, window, offset):
+        self.update(offset)
+        self.chunks_list[0][0].draw(window, offset)
+        self.chunks_list[0][1].draw(window, offset)
+        self.chunks_list[1][0].draw(window, offset)
+        self.chunks_list[1][1].draw(window, offset)
+
+    def update(self,offset):
+        offset = [offset[0]*-1, offset[1]*-1]
+        # if offsets y is > 30% of a chunks height above the center y
+        # remove the bottom 2 chunks from chunks_list
+        # move the top two chunks to the bottom
+        # generate 2 new chunks on the top
+        # X vals should not change from the current two chunks, Y values should be math.floor((offset.y-500) / 500)*500
+
+        #MOVE CHUNKS UP
+        if offset[1] < self.chunks_list[0][0].y + 0.4*2000 - 475:
+            print('getting new chunks')
+            self.chunks_list[1] = self.chunks_list[0]
+            self.chunks_list[0] = [
+                    Chunk(self.chunks_list[1][0].x, self.chunks_list[1][0].y - 2000),
+                    Chunk(self.chunks_list[1][1].x, self.chunks_list[1][1].y - 2000)
+            ]
+        #MOVE CHUNKS DOWN
+        if offset[1] > self.chunks_list[1][0].y + 0.4*2000 - 475:
+            print('getting new chunks')
+            self.chunks_list[0] = self.chunks_list[1]
+            self.chunks_list[1] = [
+                    Chunk(self.chunks_list[0][0].x, self.chunks_list[0][0].y + 2000),
+                    Chunk(self.chunks_list[0][1].x, self.chunks_list[0][1].y + 2000)
+            ]
+        #MOVE CHUNKS LEFT
+        if offset[0] < self.chunks_list[0][0].x + 0.4*2000 - 775:
+            print('getting new chunks')
+            self.chunks_list[0][1] = self.chunks_list[0][0]
+            self.chunks_list[1][1] = self.chunks_list[1][0]
+
+            self.chunks_list[0][0] = Chunk(self.chunks_list[0][0].x - 2000, self.chunks_list[0][0].y)
+            self.chunks_list[1][0] = Chunk(self.chunks_list[1][0].x - 2000, self.chunks_list[1][0].y)
+
+        #MOVE CHUNKS RIGHT
+        if offset[0] > self.chunks_list[0][1].x + 0.4*2000 - 775:
+            print('getting new chunks')
+            self.chunks_list[0][0] = self.chunks_list[0][1]
+            self.chunks_list[1][0] = self.chunks_list[1][1]
+
+            self.chunks_list[0][1] = Chunk(self.chunks_list[0][1].x + 2000, self.chunks_list[0][1].y)
+            self.chunks_list[1][1] = Chunk(self.chunks_list[1][1].x + 2000, self.chunks_list[1][1].y)
+
+
+
+    def get_obstacles(self):
+        all_obstacles = []
+        for obs in self.chunks_list[0][0].obs_list:
+            all_obstacles.append(obs)
+        for obs in self.chunks_list[0][1].obs_list:
+            all_obstacles.append(obs)
+        for obs in self.chunks_list[1][0].obs_list:
+            all_obstacles.append(obs)
+        for obs in self.chunks_list[1][1].obs_list:
+            all_obstacles.append(obs)
+        return all_obstacles
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+world = COC(0,0)
+
 obstacles = [
         Obstacle('chest.png', 200, 300, onpickup_item=item_scroll),
         Obstacle('chest.png', 700, 900, onpickup_item=item_scroll),
@@ -233,13 +628,26 @@ obstacles = [
         Obstacle('tree_1.png', 100, 900),
         Obstacle('tree_1.png', 1000, 300),
         Obstacle('fence_1.png', 1050, 300),
-        Obstacle('fence_1.png', 1000, 350)
+        Obstacle('fence_1.png', 1000, 350),
+        Obstacle('tree_1.png', 1100, 300),
+        Obstacle('tree_1.png', 1000, 400),
+        Obstacle('tree_1.png', 1150, 300),
+        Obstacle('tree_1.png', 1000, 450),
+
+        Obstacle('tree_1.png', 2000, 300),
+        Obstacle('tree_1.png', 2050, 300),
+        Obstacle('tree_1.png', 2100, 300),
+        Obstacle('tree_1.png', 2150, 300),
+        Obstacle('tree_1.png', 2150, 350),
+        Obstacle('tree_1.png', 2150, 400),
+        Obstacle('tree_1.png', 2150, 450)
+
         ]
 
 #list of all quests the player has to do
 questList = [
-        Quest('Give water to the West goblin', 'water_bucket.png', npcs[0], item_water_bucket),
-        Quest('Give a scroll to the East goblin', 'scroll.png', npcs[1], item_scroll)
+        Quest(translate('Give water to the yellow knight'), 'water_bucket.png', 'knight.png', item_water_bucket),
+        Quest(translate('Give a gold coin to the red knight'), 'gold_coin.png', 'enemy_knight.png', item_gold_coin)
         ]
 #General Images
 inventory_hover = pygame.image.load('inv_hover.png').convert_alpha()
@@ -272,7 +680,7 @@ def PauseMenu_Load():
         for line in saveLines:
                 inventoryList.append(FindItemByName(line))
 def PauseMenu_ChangeLanguage():
-        print('Change Language')
+        print('change language')
 def DONOTHING():
         print('pog')
 menubox = pygame.image.load('menubox.png').convert_alpha()
@@ -281,7 +689,7 @@ menubox_hover = pygame.image.load('menubox_hover.png').convert_alpha()
 menubox_hover = pygame.transform.scale(menubox_hover, (700, 170))
 pause = pygame.image.load('pause.png').convert_alpha()
 pause = pygame.transform.scale(pause, (496, 168))
-pauseMenuBoxes = [['Save', PauseMenu_Save], ['Load', PauseMenu_Load], ['Change Language', PauseMenu_ChangeLanguage]]
+pauseMenuBoxes = [[translate('Save'), PauseMenu_Save], [translate('Load'), PauseMenu_Load], [translate(str(language_names[languages.index(language)])), PauseMenu_ChangeLanguage]]
 #Status Bar Stuff
 statusbar = pygame.image.load('statusbar.png').convert_alpha()
 statusbar = pygame.transform.scale(statusbar, (318, 42))
@@ -291,6 +699,25 @@ manapixel = pygame.image.load('statusbar_manapixel.png').convert_alpha()
 manapixel = pygame.transform.scale(manapixel, (3, 24))
 xppixel = pygame.image.load('statusbar_xppixel.png').convert_alpha()
 xppixel = pygame.transform.scale(xppixel, (3, 24))
+leftArrowPressed = pygame.image.load('menuArrow_pressed.png').convert_alpha()
+leftArrowPressed = pygame.transform.scale(leftArrowPressed, (100, 100))
+leftArrowPressed = pygame.transform.flip(leftArrowPressed, False, False)
+leftArrow = pygame.image.load('menuArrow.png').convert_alpha()
+leftArrow = pygame.transform.scale(leftArrow, (100, 100))
+leftArrow = pygame.transform.flip(leftArrow, False, False)
+rightArrowPressed = pygame.image.load('menuArrow_pressed.png').convert_alpha()
+rightArrowPressed = pygame.transform.scale(rightArrowPressed, (100, 100))
+rightArrowPressed = pygame.transform.flip(rightArrowPressed, True, False)
+rightArrow = pygame.image.load('menuArrow.png').convert_alpha()
+rightArrow = pygame.transform.scale(rightArrow, (100, 100))
+rightArrow = pygame.transform.flip(rightArrow, True, False)
+
+#SOUND
+pygame.mixer.init()
+deathSound = pygame.mixer.Sound('SFX_Dead.wav')
+miscSound1 = pygame.mixer.Sound('SFX_Misc.wav')
+
+
 # questList.append(Quest('Find a key from the king', 'key.png', npcs[0], item_water_bucket))
 # questList.append(Quest('Get the scroll from a knight', 'scroll.png', npcs[0], item_water_bucket))
 
@@ -307,25 +734,11 @@ BROWN = (172, 113, 79)
 #Language Stuff
 # translator = Translator(to_lang="es")
 # print(translator.translate("Hello I want water please"))
-inventory_word = 'Inventory'
-def convert_language_setup():
-        global inventory_word
-        # translation = translator.translate("Der Himmel ist blau und ich mag Bananen", dest='es')
-        # print(translation.text)
-        # #output: 'The sky is blue and I like bananas'
-        inventory_word = translator.translate('Inventory', dest=language).text
-        for guy in npcs:
-                guy.message_1 = translator.translate(guy.message_1, dest=language).text
-                guy.message_2 = translator.translate(guy.message_2, dest=language).text
-                guy.message_3 = translator.translate(guy.message_3, dest=language).text
-        for quest in questList:
-                quest.goal = translator.translate(quest.goal, dest=language).text
-        for obj in obstacles:
-                obj.message = translator.translate(obj.message, dest=language).text
 
-        hero.health_text = translator.translate(hero.health_text, dest=language).text
-        hero.mana_text = translator.translate(hero.mana_text, dest=language).text
-        hero.xp_text = translator.translate(hero.xp_text, dest=language).text
+
+
+
+
 
 def updateMobs():
         mob.move()
@@ -348,18 +761,17 @@ def drawNpcs():
 def drawInventory():
         global invPositions
         global inventoryList
-        global inventory_word
         if inventory_open:
                 inventoryImage = pygame.image.load('Inventory.png').convert_alpha()
                 inventoryStartPixel = (window.get_width() - inventoryImage.get_width() * 4 + 13, int(window.get_height() / 2 - (inventoryImage.get_height() / 2) * 4))
                 inventoryImage = pygame.transform.scale(inventoryImage, (464, 800))
                 window.blit(inventoryImage, inventoryStartPixel)
-                text = font_inv.render(inventory_word, True, (139, 69, 19))
+                text = font_inv.render(translate('Inventory'), True, (139, 69, 19))
                 window.blit(text,(inventoryStartPixel[0] + int(inventoryImage.get_width() / 2) - int(text.get_width() / 2), inventoryStartPixel[1] + 65))
                 for loops, item in enumerate(inventoryList):
                         if MousePosition[0] > invPositions[loops][0] + inventoryStartPixel[0] and MousePosition[0] < invPositions[loops][0] + inventoryStartPixel[0] + 80 and MousePosition[1] > invPositions[loops][1] + inventoryStartPixel[1] and MousePosition[1] < invPositions[loops][1] + inventoryStartPixel[1] + 80:
                                 window.blit(inventory_hover, (int(invPositions[loops][0] + inventoryStartPixel[0]), int(invPositions[loops][1] + inventoryStartPixel[1])))
-                        itemTitle = font_inv_small.render((inventoryList[loops].name), True, BLACK)
+                        itemTitle = font_inv_small.render((translate(inventoryList[loops].name)), True, BLACK)
                         window.blit(itemTitle, (int(invPositions[loops][0] + inventoryStartPixel[0] - (itemTitle.get_width() / 2)) + 40, invPositions[loops][1] + inventoryStartPixel[1] + 85))
                         window.blit(inventoryList[loops].image, (int(invPositions[loops][0] + inventoryStartPixel[0] + 8), int(invPositions[loops][1] + inventoryStartPixel[1] + 8)))
                         if loops == 23:
@@ -373,7 +785,7 @@ def checkInteraction():
                         interactable = True
                         # try to give the npc an item
                         for thing in inventoryList:
-                                if len(questList) > 0 and thing.name == questList[current_quest].target_item.name and guy.name == questList[current_quest].target_npc.name:
+                                if len(questList) > 0 and thing.name == questList[current_quest].target_item.name and guy.image_name == questList[current_quest].target_npc:
                                         guy.complete_quest()
                                         inventoryList.remove(thing)
                                         hero.add_xp(75)
@@ -382,8 +794,8 @@ def checkInteraction():
                                         break
                         break
                         #drawMessage()
-        for obj in obstacles:
-                if CheckDistance((hero.x, hero.y), (obj.x, obj.y)) < 100:
+        for obj in world.get_obstacles():
+                if CheckDistance((hero.x - offset[0], hero.y - offset[1]), (obj.x, obj.y)) < 100:
                         item_got = obj.onpickup_item
                         if item_got != None:
                                 pinMessage(obj.message)
@@ -420,11 +832,11 @@ def drawMessage():
                                 window.blit(textbox_image, (int(window.get_width() / 2 - textbox_image.get_width() / 2), window.get_height() - textbox_image.get_height()))
                                 text = font_message.render(guy.name, True, (139, 69, 19))
                                 window.blit(text, (int(window.get_width() / 2 - textbox_image.get_width() / 2) + 50, window.get_height() - textbox_image.get_height()))
-                                text = font_message.render(guy.message_1, True, (139, 69, 19))
+                                text = font_message.render(translate(guy.message_1), True, (139, 69, 19))
                                 window.blit(text, (int(window.get_width() / 2 - textbox_image.get_width() / 2) + 50, window.get_height() - textbox_image.get_height() + 50))
-                                text = font_message.render(guy.message_2, True, (139, 69, 19))
+                                text = font_message.render(translate(guy.message_2), True, (139, 69, 19))
                                 window.blit(text, (int(window.get_width() / 2 - textbox_image.get_width() / 2) + 50, window.get_height() - textbox_image.get_height() + 85))
-                                text = font_message.render(guy.message_3, True, (139, 69, 19))
+                                text = font_message.render(translate(guy.message_3), True, (139, 69, 19))
                                 window.blit(text, (int(window.get_width() / 2 - textbox_image.get_width() / 2) + 50, window.get_height() - textbox_image.get_height() + 120))
 
 def drawQuest():
@@ -434,9 +846,9 @@ def drawQuest():
         quest_icon = pygame.transform.scale(quest_icon, (64, 64))
         window.blit(textbox_image, (0, 0))
         if len(questList) > 0:
-                text = font_questbox.render(questList[current_quest].goal, True, BLACK)
+                text = font_questbox.render(translate(questList[current_quest].goal), True, BLACK)
                 window.blit(text, (20, (int(textbox_image.get_height() / 2 - (text.get_height() / 2)))))
-                text = font_questbox.render(questList[current_quest].goal, True, YELLOW)
+                text = font_questbox.render(translate(questList[current_quest].goal), True, YELLOW)
                 window.blit(text, (22, (int(textbox_image.get_height() / 2 - (text.get_height() / 2)))))
                 if questList[current_quest].time_spent > 3:
                         window.blit(questList[current_quest].target_item.image, (402, 20))
@@ -454,9 +866,9 @@ def drawStatsUI():
         window.blit(statusbar, (window.get_width() - statusbar.get_width() - 10, 10))
         window.blit(statusbar, (window.get_width() - statusbar.get_width() - 10, 20 + statusbar.get_height()))
         window.blit(statusbar, (window.get_width() - statusbar.get_width() - 10, 30 + (statusbar.get_height() * 2)))
-        healthText = font_inv_small.render(hero.health_text, True, WHITE)
-        manaText = font_inv_small.render(hero.mana_text, True, WHITE)
-        xpText = font_inv_small.render(hero.xp_text, True, WHITE)
+        healthText = font_inv_small.render(translate('Health: ' + str(hero.health) + ' of 100'), True, WHITE)
+        manaText = font_inv_small.render(translate('Mana: ' + str(hero.mana) + ' of 100'), True, WHITE)
+        xpText = font_inv_small.render(translate('experiance: ' + str(hero.xp) + ' of ' + str(100 + ((hero.level-1) * 25))), True, WHITE)
         window.blit(healthText, (int(window.get_width() - statusbar.get_width() - 10 + statusbar.get_width() / 2 - healthText.get_width() / 2), int(10 + statusbar.get_height() / 2 - healthText.get_height() / 2)))
         window.blit(manaText, (int(window.get_width() - statusbar.get_width() - 10 + statusbar.get_width() / 2 - manaText.get_width() / 2), int(20 + statusbar.get_height() + statusbar.get_height() / 2 - healthText.get_height() / 2)))
         window.blit(xpText, (int(window.get_width() - statusbar.get_width() - 10 + statusbar.get_width() / 2 - xpText.get_width() / 2), int(30 + (statusbar.get_height() * 2 + statusbar.get_height() / 2 - healthText.get_height() / 2))))
@@ -484,26 +896,38 @@ def drawDebug():
         window.blit(mouseLoc, (window.get_width() - 80, window.get_height() - mouseLoc.get_height()))
         window.blit(FPSCount, (window.get_width() - 80, window.get_height() - (mouseLoc.get_height() * 2)))
 
+
 def move(direction):
+        global offset
         collision = False
         if direction == 'up':
+
                 for obs in obstacles:
-                        if abs(hero.x - obs.x) < 40 and (hero.y - obs.y < 35) and (hero.y - obs.y > 0):
+                        if abs(hero.x - obs.x) < 40 and (hero.y - obs.y < 26) and (hero.y - obs.y > 0) and obs.collidable:
+                                collision = True
+                for obs in world.get_obstacles():
+                        if abs(hero.x - offset[0] - obs.x) < 40 and (hero.y - offset[1] - obs.y < 26) and (hero.y - offset[1] - obs.y > 0) and obs.collidable:
                                 collision = True
                 for guy in npcs:
-                        if abs(hero.x - guy.x) < 40 and (hero.y - guy.y < 35) and (hero.y - guy.y > 0):
+                        if abs(hero.x - guy.x) < 40 and (hero.y - guy.y < 26) and (hero.y - guy.y > 0):
                                 collision = True
                 # if abs(hero.x - mob.x) < 40 and (hero.y - mob.y < 35) and (hero.y - mob.y > 0):
                 #       collision = True
                 if not collision:
+                        offset[1] += hero.vel
                         for obs in obstacles:
                                 obs.y += hero.vel
                         for guy in npcs:
                                 guy.y += hero.vel
                         mob.y += hero.vel
+                        if mob.goal is not None:
+                            mob.goal[1] += hero.vel
         if direction == 'down':
                 for obs in obstacles:
-                        if abs(hero.x - obs.x) < 40 and (obs.y - hero.y < 50) and (obs.y - hero.y > 0):
+                        if abs(hero.x - obs.x) < 40 and (obs.y - hero.y < 50) and (obs.y - hero.y > 0) and obs.collidable:
+                                collision = True
+                for obs in world.get_obstacles():
+                        if abs(hero.x - offset[0] - obs.x) < 40 and (obs.y - hero.y+offset[1] < 50) and (obs.y - hero.y+offset[1] > 0) and obs.collidable:
                                 collision = True
                 for guy in npcs:
                         if abs(hero.x - guy.x) < 40 and (guy.y - hero.y < 50) and (guy.y - hero.y > 0):
@@ -511,14 +935,20 @@ def move(direction):
                 # if abs(hero.x - mob.x) < 40 and (mob.y - hero.y < 50) and (mob.y - hero.y > 0):
                 #       collision = True
                 if not collision:
+                        offset[1] -= hero.vel
                         for obs in obstacles:
                                 obs.y -= hero.vel
                         for guy in npcs:
                                 guy.y -= hero.vel
                         mob.y -= hero.vel
+                        if mob.goal is not None:
+                            mob.goal[1] -= hero.vel
         if direction == 'left':
                 for obs in obstacles:
-                        if hero.x - obs.x < 50 and hero.x - obs.x > 0 and (((hero.y - obs.y < 25) and (hero.y - obs.y > 0)) or (obs.y - hero.y < 45) and (obs.y - hero.y > 0)):
+                        if hero.x - obs.x < 50 and hero.x - obs.x > 0 and (((hero.y - obs.y < 25) and (hero.y - obs.y > 0)) or (obs.y - hero.y < 45) and (obs.y - hero.y > 0)) and obs.collidable:
+                                collision = True
+                for obs in world.get_obstacles():
+                        if hero.x - offset[0] - obs.x < 50 and hero.x - offset[0] - obs.x > 0 and (((hero.y - offset[1] - obs.y < 25) and (hero.y - offset[1] - obs.y > 0)) or (obs.y - hero.y + offset[1] < 45) and (obs.y - hero.y + offset[1] > 0)) and obs.collidable:
                                 collision = True
                 for guy in npcs:
                         if hero.x - guy.x < 50 and hero.x - guy.x > 0 and (((hero.y - guy.y < 25) and (hero.y - guy.y > 0)) or (guy.y - hero.y < 45) and (guy.y - hero.y > 0)):
@@ -526,14 +956,20 @@ def move(direction):
                 # if hero.x - mob.x < 50 and hero.x - mob.x > 0 and (((hero.y - mob.y < 25) and (hero.y - mob.y > 0)) or (mob.y - hero.y < 45) and (mob.y - hero.y > 0)):
                 #       collision = True
                 if not collision:
+                        offset[0] += hero.vel
                         for obs in obstacles:
                                 obs.x += hero.vel
                         for guy in npcs:
                                 guy.x += hero.vel
                         mob.x += hero.vel
+                        if mob.goal is not None:
+                            mob.goal[0] += hero.vel
         if direction == 'right':
                 for obs in obstacles:
-                        if obs.x - hero.x < 50 and obs.x - hero.x > 0 and (((hero.y - obs.y < 25) and (hero.y - obs.y > 0)) or (obs.y - hero.y < 45) and (obs.y - hero.y > 0)):
+                        if obs.x - hero.x < 50 and obs.x - hero.x > 0 and (((hero.y - obs.y < 25) and (hero.y - obs.y > 0)) or (obs.y - hero.y < 45) and (obs.y - hero.y > 0)) and obs.collidable:
+                                collision = True
+                for obs in world.get_obstacles():
+                        if obs.x - hero.x + offset[0] < 50 and obs.x - hero.x + offset[0] > 0 and (((hero.y - offset[1] - obs.y < 25) and (hero.y - offset[1] - obs.y > 0)) or (obs.y - hero.y + offset[1] < 45) and (obs.y - hero.y + offset[1] > 0)) and obs.collidable:
                                 collision = True
                 for guy in npcs:
                         if guy.x - hero.x < 50 and guy.x - hero.x > 0 and (((hero.y - guy.y < 25) and (hero.y - guy.y > 0)) or (guy.y - hero.y < 45) and (guy.y - hero.y > 0)):
@@ -541,11 +977,14 @@ def move(direction):
                 # if mob.x - hero.x < 50 and mob.x - hero.x > 0 and (((hero.y - mob.y < 25) and (hero.y - mob.y > 0)) or (mob.y - hero.y < 45) and (mob.y - hero.y > 0)):
                 #       collision = True
                 if not collision:
+                        offset[0] -= hero.vel
                         for obs in obstacles:
                                 obs.x -= hero.vel
                         for guy in npcs:
                                 guy.x -= hero.vel
                         mob.x -= hero.vel
+                        if mob.goal is not None:
+                            mob.goal[0] -= hero.vel
 
 def CheckDistance(pos1, pos2):
         distance = ((pos1[0] - pos2[0])**2 + (pos2[1] - pos1[1])**2)**0.5
@@ -561,7 +1000,6 @@ def updateDelays():
                 questList[current_quest].time_spent
 
 
-convert_language_setup()
 e_held = False
 return_held = False
 
@@ -576,6 +1014,7 @@ BEGINPAUSE = False
 escapeHeld = False
 #The main loop where the game runs
 run = True
+
 while run:
         ## DEBUG:
         MousePosition = pygame.mouse.get_pos()
@@ -602,15 +1041,19 @@ while run:
         if keys[pygame.K_ESCAPE] and escapeHeld == False:
                 BEGINPAUSE = True
         if BEGINPAUSE == True and FRAMEENDED == True:
+                miscSound1.play()
                 escapeHeld = True
                 pauseBG = pygame.transform.scale(pauseBG, (window.get_width(), window.get_height()))
                 window.blit(pauseBG, (0, 0))
                 dimensions = (window.get_width(), window.get_height())
                 boxSelected = 0
                 keyHeld = False
+                dHeld = False
                 enterHeld = False
                 isSaved = False
                 isLoaded = False
+                isLeft = False
+                isRight = False
                 while True:
                         #Handle window resizing
                         if (window.get_width(), window.get_height()) != dimensions:
@@ -623,42 +1066,109 @@ while run:
                                 escapeHeld = True
                                 BEGINPAUSE = False
                                 FRAMEENDED = False
+                                miscSound1.play()
                                 break
                         if keys[pygame.K_ESCAPE] == False:
                                 escapeHeld = False
                         #Move menu up/down
-                        if keys[pygame.K_w] and keyHeld == False:
-                                if boxSelected == 0:
-                                        boxSelected = 2
-                                else:
-                                        boxSelected = boxSelected - 1
-                        elif keys[pygame.K_s] == True and keyHeld == False:
-                                if boxSelected == 2:
-                                        boxSelected = 0
-                                else:
-                                        boxSelected = boxSelected + 1
-                        if keys[pygame.K_w] == False and keys[pygame.K_s] == False:
+                        if not keys[pygame.K_w] and not keys[pygame.K_s] and not keys[pygame.K_d] and not keys[pygame.K_a]:
                                 keyHeld = False
-                        else:
+                                isLeft = False
+                                isRight = False
+
+                        if keys[pygame.K_w] and keyHeld == False:
+                                miscSound1.play()
                                 keyHeld = True
+                                if boxSelected == 0:
+                                    boxSelected = 2
+                                else:
+                                    boxSelected = boxSelected - 1
+                        elif keys[pygame.K_s] == True and keyHeld == False:
+                                miscSound1.play()
+                                keyHeld = True
+                                if boxSelected == 2:
+                                    boxSelected = 0
+                                else:
+                                    boxSelected = boxSelected + 1
+
                         #Click menu button
                         if keys[pygame.K_RETURN] and enterHeld == False:
                                 pauseMenuBoxes[boxSelected][1]()
                                 enterHeld = True
                         if keys[pygame.K_RETURN] == False:
                                 enterHeld = False
+
+                        if keys[pygame.K_d] and keyHeld == False and boxSelected == 2:
+                                language = languages[(languages.index(language)+1) % len(languages)]
+                                print('Changed language to: ' + language_names[(languages.index(language))])
+                                miscSound1.play()
+                                keyHeld = True
+                                isRight = True
+
+                                if language == "ar":
+                                    font_inv = font_inv_arabic
+                                    font_inv_small = font_inv_small_arabic
+                                    font_message = font_message_arabic
+                                    debugFont = debugFont_arabic
+                                    font_questbox = font_questbox_arabic
+                                else:
+                                    font_inv = font_inv_english
+                                    font_inv_small = font_inv_small_english
+                                    font_message = font_message_english
+                                    debugFont = debugFont_english
+                                    font_questbox = font_questbox_english
+
+                        if keys[pygame.K_a] and keyHeld == False and boxSelected == 2:
+                                language = languages[(languages.index(language)-1) % len(languages)]
+                                print('Changed language to: ' + language_names[(languages.index(language))])
+                                miscSound1.play()
+                                keyHeld = True
+                                isLeft = True
+
+                                if language == "ar":
+                                    font_inv = font_inv_arabic
+                                    font_inv_small = font_inv_small_arabic
+                                    font_message = font_message_arabic
+                                    debugFont = debugFont_arabic
+                                    font_questbox = font_questbox_arabic
+                                else:
+                                    font_inv = font_inv_english
+                                    font_inv_small = font_inv_small_english
+                                    font_message = font_message_english
+                                    debugFont = debugFont_english
+                                    font_questbox = font_questbox_english
+
+
                         #Blit 'pause' and boxes, text
                         window.blit(pause, (int(window.get_width() / 2 - pause.get_width() / 2), 50))
                                 #'Save!'/'Load!' text
+
+
+                        window.blit(leftArrow, (int(window.get_width() / 2 - menubox.get_width() / 2 - 100), int(260 + ((menubox.get_height() + 50) * 2) + menubox.get_height() / 2 - leftArrowPressed.get_height() / 2)))
+                        window.blit(rightArrow, (int(window.get_width() / 2 + menubox.get_width() / 2), int(260 + ((menubox.get_height() + 50) * 2) + menubox.get_height() / 2 - leftArrowPressed.get_height() / 2)))
+
+                        if isLeft == True:
+                            # window.blit(menubox, (int(window.get_width() / 2 - menubox.get_width() / 2), 260 + (menubox.get_height() + 50) * pauseMenuBoxes.index(box)))
+                            #
+                            window.blit(leftArrowPressed, (int(window.get_width() / 2 - menubox.get_width() / 2 - 100), int(260 + ((menubox.get_height() + 50) * 2) + menubox.get_height() / 2 - leftArrowPressed.get_height() / 2)))
+                            pauseMenuBoxes = [[translate('Save'), PauseMenu_Save], [translate('Load'), PauseMenu_Load], [translate(str(language_names[languages.index(language)])), PauseMenu_ChangeLanguage]]
+                        if isRight == True:
+                            # window.blit(menubox, (int(window.get_width() / 2 - menubox.get_width() / 2), 260 + (menubox.get_height() + 50) * pauseMenuBoxes.index(box)))
+                            #
+                            window.blit(rightArrowPressed, (int(window.get_width() / 2 + menubox.get_width() / 2), int(260 + ((menubox.get_height() + 50) * 2) + menubox.get_height() / 2 - leftArrowPressed.get_height() / 2)))
+                            pauseMenuBoxes = [[translate('Save'), PauseMenu_Save], [translate('Load'), PauseMenu_Load], [translate(str(language_names[languages.index(language)])), PauseMenu_ChangeLanguage]]
+
+
+
                         if isSaved == True:
-                                savedText = font_inv.render('Saved!', True, BLACK)
+                                savedText = font_inv.render(translate('Saved!'), True, BLACK)
                                 window.blit(savedText, (int(window.get_width() / 2 + menubox.get_width() / 2 + 30), int(260 + menubox.get_height() / 2 - savedText.get_height() / 2)))
-                                savedText = font_inv.render('Saved!', True, YELLOW)
+                                savedText = font_inv.render(translate('Saved!'), True, YELLOW)
                                 window.blit(savedText, (int(window.get_width() / 2 + menubox.get_width() / 2 + 32), int(260 + menubox.get_height() / 2 - savedText.get_height() / 2)))
                         if isLoaded == True:
-                                savedText = font_inv.render('Loaded!', True, BLACK)
+                                savedText = font_inv.render(translate('Loaded!'), True, BLACK)
                                 window.blit(savedText, (int(window.get_width() / 2 + menubox.get_width() / 2 + 30), int(260 + menubox.get_height() / 2 - savedText.get_height() / 2 + menubox.get_height() + 50)))
-                                savedText = font_inv.render('Loaded!', True, YELLOW)
+                                savedText = font_inv.render(translate('Loaded!!'), True, YELLOW)
                                 window.blit(savedText, (int(window.get_width() / 2 + menubox.get_width() / 2 + 32), int(260 + menubox.get_height() / 2 - savedText.get_height() / 2 + menubox.get_height() + 50)))
                         for box in pauseMenuBoxes:
                                 window.blit(menubox, (int(window.get_width() / 2 - menubox.get_width() / 2), 260 + (menubox.get_height() + 50) * pauseMenuBoxes.index(box)))
@@ -705,14 +1215,7 @@ while run:
 
         #draw in all the stuff
         window.fill((0,0,0)) #fill background, deletes old positions of stuff
-
-        #If goint to pause next frame, don't draw UI elements
-        if BEGINPAUSE == False:
-                drawStatsUI()
-                drawQuest()
-                drawDebug()
-        else:
-                FRAMEENDED = True
+        world.draw(window, offset)
 
         drawObstacles()
         drawNpcs()
@@ -723,7 +1226,21 @@ while run:
         drawPinnedMessage()
         updateDelays()
 
+        #If goint to pause next frame, don't draw UI elements
+        if BEGINPAUSE == False:
+                drawStatsUI()
+                drawQuest()
+                drawDebug()
+        else:
+                FRAMEENDED = True
+
+
+
         pygame.display.update()
+
+f = open("translations.json", "w", encoding='utf-8')
+json.dump(all_translated_text, f, ensure_ascii=False)
+f.close()
 pygame.quit()
 sys.exit(0)
 
