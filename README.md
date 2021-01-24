@@ -1,6 +1,6 @@
 ## Instructions to run
-`pip install -r requirements.txt
-python main.py`
+`pip install -r requirements.txt`
+`python main.py`
 ## Inspiration
 Everyone knows the fastest way to learn a language is to live in a society that speaks the language. Conventional apps and websites used to learn a language take lots of time and practice compared to learning through experiences. In The Rosetta Throne, you can learn the language by doing 'real world' quests, and have fun playing a video game while you learn.
 ## What it does
