@@ -35,6 +35,15 @@ for lang in language_names:
 
 
 
+class Tile(object):
+    """docstring for Tile."""
+
+    def __init__(self, image, x, y):
+        super(Tile, self).__init__()
+        self.image = pygame.image.load(image).convert_alpha()
+        self.image = pygame.transform.scale(self.image, (200, 200))
+        self.x  = x
+        self.y  = y
 
 
 class Obstacle(object):
@@ -150,8 +159,8 @@ class Mob(object):
                             self.goal = [hero.x, hero.y]
                 if self.goal is not None and CheckDistance(self.goal, (self.x, self.y)) > 1:
                     total = abs(self.goal[0] - self.x) + abs(self.goal[1] - self.y)
-                    self.x += 0.9* (self.goal[0] - self.x) / total
-                    self.y += 0.9* (self.goal[1] - self.y) / total
+                    self.x += 2* (self.goal[0] - self.x) / total
+                    self.y += 2* (self.goal[1] - self.y) / total
                 else:
                     self.goal = None
                     return False
@@ -183,7 +192,7 @@ class Player(object):
                 self.image = pygame.transform.scale(self.image, (50, 50))
                 self.x = 775
                 self.y = 475
-                self.vel = 10 ###SET TO 1 FOR REAL GAMEPLAY
+                self.vel = 3 ###SET TO 1 FOR REAL GAMEPLAY
                 self.xp = 0
                 self.health = 100
                 self.mana = 100
@@ -195,13 +204,14 @@ class Player(object):
                 self.xp_text = str(self.xp) + '/' + str(100 + ((self.level-1) * 25)) +' XP'
                 if self.xp >= amount_to_next_level:
                         self.level += 1
-                        self.add_xp(amount - amount_to_next_level)
-                        pinMessage(translate('Level up!'))
+                        self.xp -= amount_to_next_level
 
         def change_health(self, amount):
                 self.health += amount
                 if self.health < 0:
                         print("TODO: YOU DIED")
+
+
 
 
 class Item(object):
@@ -242,7 +252,13 @@ global isSaved
 global isLoaded
 global hero
 hero = Player()
-mob = Mob('goblin.png', 700, 700, 'Buckethead')
+mobs = []#Mob('goblin.png', 700, 700, 'Buckethead')]
+        # Mob('goblin.png', 200, 700, 'Buckethead'),
+        # Mob('goblin.png', 700, 300, 'Buckethead'),
+        # Mob('goblin.png', 750, 700, 'Buckethead'),
+        # Mob('goblin.png', 750, 750, 'Buckethead'),
+        # Mob('goblin.png', 850, 700, 'Buckethead'),
+        # Mob('goblin.png', 700, 950, 'Buckethead')]
 pygame.init()
 pygame.font.init()
 
@@ -332,7 +348,8 @@ class Chunk(object):
         super(Chunk, self).__init__()
         # np.random.seed(str(x) + "---" + str(y))
 
-        sin_vals = (np.sin(x / 6000 + 10) + 0.1*np.sin(x / 2500) + np.sin(y / 900 + 2468) + 0.07*np.sin(y / 2500)) / 2.17 # between -1 and 1
+        sin_vals = (np.sin(x / 3000 + 10)  + 0.1*np.sin(x / 1500) + np.sin(y / 2900 + 2468) + 0.07*np.sin(y / 1200)) / 2.17 # between -1 and 1
+        sin_vals_2 = (np.sin(x / 2900 + 120) + 0.1*np.sin(x / 1900) + np.sin(y / 2470 + 268) + 0.07*np.sin(y / 532 + 5)) / 2.17 # between -1 and 1
 
         np.random.seed((abs(x + (3*y+7)) + x + y + int(np.sin(y))*1000) % 2**31 )
 
@@ -341,22 +358,80 @@ class Chunk(object):
 
 
         #VARIATIONS
+        self.biome_type = None
 
-        self.rgb = (128 + 100*sin_vals, 0,0)
-        self.vege = sin_vals
-        if self.vege > .5:
-            self.rgb = (0, 255, 0)
-        elif self.vege > -0.5:
-            self.rgb = (210, 180, 140)
+        tree_spawn_limit = (1.5-(sin_vals+1))/2.0 + 0.75
+
+        if sin_vals > 0.66:
+            self.biome_type = "forest"
+            type_of_tile = 'darkgrass.png'
+            # tree_spawn_limit = 0.6
+            tree_type = 'tree_1.png'
+            path_type = 'dirt.png'
+        elif sin_vals > .33:
+            self.biome_type = "grasslands"
+            type_of_tile = 'grass.png'
+            # tree_spawn_limit = 1.3
+            tree_type = 'tree_1.png'
+            path_type = 'dirt.png'
+        elif sin_vals > .0:
+            self.biome_type = 'savannah'
+            type_of_tile = 'dirt.png'
+            # tree_spawn_limit = 1.4
+            tree_type = 'bush.png'
+            path_type = 'cobblestone.png'
+        elif sin_vals > -.33:
+            self.biome_type = 'desert'
+            type_of_tile = 'sand.png'
+            # tree_spawn_limit = 1.4
+            tree_type = 'cactus.png'
+            path_type = 'cobblestone.png'
+        elif sin_vals > -.66:
+            self.biome_type = 'mountain'
+            type_of_tile = 'mountain.png'
+            # tree_spawn_limit = 1.4
+            tree_type = 'rock.png'
+            path_type = 'cobblestone.png'
         else:
-            self.rgb = (192, 192, 192)
+            self.biome_type = "tundra"
+            type_of_tile = 'snow.png'
+            # tree_spawn_limit = 1.5
+            tree_type = 'evergreen.png'
+            path_type = 'dirt.png'
 
-        obstacle_frequency = self.vege + 1
+
+        def get_tree_type(xx, yy):
+            tree_sin_vals = (np.sin(xx / 3000 + 10)  + 0.1*np.sin(xx / 1500) + np.sin(yy / 2900 + 2468) + 0.07*np.sin(yy / 1200)) / 2.17 # between -1 and 1
+
+            tree_sin_vals += np.random.uniform(-0.1, 0.1)
+            if tree_sin_vals > 0.66:
+                return 'tree_1.png'
+            elif tree_sin_vals > .33:
+                return 'tree_1.png'
+            elif tree_sin_vals > .0:
+                return 'bush.png'
+            elif tree_sin_vals > -.33:
+                return 'cactus.png'
+            elif tree_sin_vals > -.66:
+                return 'rock.png'
+            return 'evergreen.png'
+
+
+
 
         self.obs_list = []
+        self.npcs_list = [Npc('knight.png', self.x+100, self.y+100, translate('Give me a scroll'), '', 'Ethan'),
+                          Npc('enemy_knight.png', self.x+200, self.y+200, translate('Give me a scroll'), '', 'Devin')
+        ]
+
         pot_house_spots = []
         pot_chest_spots = []
         pot_npc_spots = []
+
+        self.tiles_list = [
+            [Tile(type_of_tile, xx, yy) for xx in range(self.x, self.x+2000, 200)]
+            for yy in range(self.y, self.y+2000, 200)
+        ]
         #Roads, rivers, and bridges, etc
         for xx in range(self.x, self.x+2000, 50):
             for yy in range(self.y, self.y+2000, 50):
@@ -420,20 +495,20 @@ class Chunk(object):
         #                 npcs.append(Npc(npc_type, spot[0]+offset[0], spot[1]+offset[1], 'Can I have a gold coin, please?', '', 'Ethan'))
         #
         #
-        # for xx in range(self.x, self.x+2000, 50):
-            # for yy in range(self.y, self.y+2000, 50):
-            #     forest_sin_x = (np.sin(xx / 100) +     2*np.sin(xx / 200 + 17)  +  4*np.sin(xx / 500 + 7)    )/7
-            #     forest_sin_y = (np.sin(yy / 150 + 5) + 2*np.sin(yy / 158 + 127) +  4*np.sin(yy / 450 + 77)   )/7
-            #     if abs(forest_sin_x + forest_sin_y) > 1.3:
-            #         can_add_tree = True
-            #         for obj in self.obs_list:
-            #             if obj.x == xx and obj.y == yy:
-            #                 can_add_tree = False
-            #         for npc in npcs:
-            #             if npc.x == xx and npc.y == yy:
-            #                 can_add_tree = False
-            #         if can_add_tree:
-            #             self.obs_list.append(Obstacle('tree_1.png', xx, yy, collidable=False))
+        for xx in range(self.x, self.x+2000, 50):
+            for yy in range(self.y, self.y+2000, 50):
+                forest_sin_x = (np.sin(xx / 100) +     2*np.sin(xx / 200 + 17)  +  4*np.sin(xx / 500 + 7)    )/7
+                forest_sin_y = (np.sin(yy / 150 + 5) + 2*np.sin(yy / 158 + 127) +  4*np.sin(yy / 450 + 77)   )/7
+                if abs(forest_sin_x + forest_sin_y) > tree_spawn_limit:
+                    can_add_tree = True
+                    for obj in self.obs_list:
+                        if obj.x == xx and obj.y == yy:
+                            can_add_tree = False
+                    for npc in npcs:
+                        if npc.x == xx and npc.y == yy:
+                            can_add_tree = False
+                    if can_add_tree:
+                        self.obs_list.append(Obstacle(get_tree_type(xx,yy), xx, yy, collidable=False))
 
 
         def is_clear(top_left, bottom_right):
@@ -449,10 +524,21 @@ class Chunk(object):
 
             contains_a_road = False
             for obj in self.obs_list:
-                if  obj.x >= top_left[0] and obj.x < bottom_right[0] and obj.y >= top_left[1] and obj.y < bottom_right[1] and obj.image_name == "dirt.png":
+                if  obj.x >= top_left[0] and obj.x < bottom_right[0] and obj.y >= top_left[1] and obj.y < bottom_right[1] and (obj.image_name == "dirt.png" or obj.image_name == "cobblestone.png" or obj.image_name == "granite.png" ):
                     contains_a_road = True
                     break
-            return is_clear([top_left[0]+50, top_left[1]+50], [bottom_right[0]-50, bottom_right[1]-50]) and contains_a_road
+            return is_clear([top_left[0]+50, top_left[1]+50], [bottom_right[0]-50, bottom_right[1]-50]) and (contains_a_road or np.random.uniform(0,1) > 0.99)
+
+        def chest_spot_valid(target_spot):
+            top_left = [target_spot[0]-50, target_spot[1]-50]
+            bottom_right = [target_spot[0]+50, target_spot[1]+50]
+
+            contains_a_road = False
+            for obj in self.obs_list:
+                if  obj.x >= top_left[0] and obj.x <= bottom_right[0] and obj.y >= top_left[1] and obj.y <= bottom_right[1] and (obj.image_name == "dirt.png" or obj.image_name == "cobblestone.png" or obj.image_name == "granite.png"):
+                    contains_a_road = True
+                    break
+            return is_clear([top_left[0]+50, top_left[1]+50], [bottom_right[0], bottom_right[1]]) and contains_a_road
 
         def create_road(start, direction, length):
             if length < 5:
@@ -462,7 +548,7 @@ class Chunk(object):
                 bottom_right = [start[0]-50, start[1]+50]
                 if is_clear(top_left, bottom_right):
                     for l in range(1,length+1):
-                        self.obs_list.append(Obstacle('dirt.png', start[0]-l*50, start[1], collidable=False))
+                        self.obs_list.append(Obstacle(path_type, start[0]-l*50, start[1], collidable=False))
                     for i in range(5):
                         random_start = [np.random.choice(range(start[0]-50,start[0] - length*50,-50),1)[0],
                                         start[1]]
@@ -474,7 +560,7 @@ class Chunk(object):
                 bottom_right = [start[0]+(length+1)*50, start[1]+50]
                 if is_clear(top_left, bottom_right):
                     for l in range(1,length+1):
-                        self.obs_list.append(Obstacle('dirt.png', start[0]+l*50, start[1], collidable=False))
+                        self.obs_list.append(Obstacle(path_type, start[0]+l*50, start[1], collidable=False))
                     for i in range(5):
                         random_start = [np.random.choice(range(start[0]+50,start[0] + length*50,50),1)[0],
                                         start[1]]
@@ -486,7 +572,7 @@ class Chunk(object):
                 bottom_right = [start[0]+50, start[1]-50]
                 if is_clear(top_left, bottom_right):
                     for l in range(1,length+1):
-                        self.obs_list.append(Obstacle('dirt.png', start[0], start[1]-l*50, collidable=False))
+                        self.obs_list.append(Obstacle(path_type, start[0], start[1]-l*50, collidable=False))
                     for i in range(5):
                         random_start = [start[0],
                                         np.random.choice(range(start[1]-50,start[1] - length*50,-50),1)[0]]
@@ -498,7 +584,7 @@ class Chunk(object):
                 bottom_right = [start[0]+50, start[1]+(length+1)*50]
                 if is_clear(top_left, bottom_right):
                     for l in range(1,length+1):
-                        self.obs_list.append(Obstacle('dirt.png', start[0], start[1]+l*50, collidable=False))
+                        self.obs_list.append(Obstacle(path_type, start[0], start[1]+l*50, collidable=False))
                     for i in range(5):
                         random_start = [start[0],
                                         np.random.choice(range(start[1]+50,start[1] + length*50,50),1)[0]]
@@ -511,19 +597,39 @@ class Chunk(object):
 
         create_road([self.x+50*(np.random.randint(40)), self.y+50*(np.random.randint(40))], np.random.randint(4), np.random.randint(20,30))
 
-
+        #MAKE SOME HOUSES
         for xx in range(self.x, self.x+2000, 50):
             for yy in range(self.y, self.y+2000, 50):
+
                 if house_spot_valid([xx, yy]):
-                    self.obs_list.append(Obstacle('cabin2.png', xx, yy, collidable=False, x_size=250, y_size=150))
-                    for xoff in range(0, 5):
-                        for yoff in range(0,3):
-                            self.obs_list.append(Obstacle('nothing.png', xx+xoff*(50), yy+yoff*50, collidable=False))
+                    chance_of_house = np.random.randint(0,8)
+                    if chance_of_house == 0:
+                        self.obs_list.append(Obstacle('cabin2.png', xx, yy, collidable=False, x_size=250, y_size=150))
+                        for xoff in range(0, 5):
+                            for yoff in range(0,3):
+                                self.obs_list.append(Obstacle('nothing.png', xx+xoff*(50), yy+yoff*50, collidable=False))
+
+        #MAKE SOME CHESTS
+        for xx in range(self.x, self.x+2000, 50):
+            for yy in range(self.y, self.y+2000, 50):
+                if chest_spot_valid([xx, yy]):
+                    chance_of_chest = np.random.randint(0,15)
+                    item = np.random.randint(0,len(itemList))
+                    if chance_of_chest == 0:
+                        self.obs_list.append(Obstacle('chest.png', xx, yy, collidable=False, onpickup_item=itemList[item]))
+                    if chance_of_chest == 1:
+                        self.obs_list.append(Obstacle('barrel.png', xx, yy, collidable=False, onpickup_item=itemList[item]))
 
     def draw(self, window, offset):
-        pygame.draw.rect(window, self.rgb, (self.x+offset[0], self.y+offset[1], 2000, 2000))
+        # pygame.draw.rect(window, self.rgb, (self.x+offset[0], self.y+offset[1], 2000, 2000))
+        for x in range(len(self.tiles_list)):
+            for y in range(len(self.tiles_list[0])):
+                tile = self.tiles_list[x][y]
+                window.blit(tile.image, (tile.x+offset[0], tile.y+offset[1]))
         for obs in self.obs_list:
-                window.blit(obs.image, (obs.x+offset[0], obs.y+offset[1]))
+            window.blit(obs.image, (obs.x+offset[0], obs.y+offset[1]))
+        for npc in self.npcs_list:
+            window.blit(npc.image, (npc.x+offset[0], npc.y+offset[1]))
 
 
 
@@ -554,7 +660,7 @@ class COC(object):
 
         #MOVE CHUNKS UP
         if offset[1] < self.chunks_list[0][0].y + 0.4*2000 - 475:
-            print('getting new chunks')
+            #print('getting new chunks')
             self.chunks_list[1] = self.chunks_list[0]
             self.chunks_list[0] = [
                     Chunk(self.chunks_list[1][0].x, self.chunks_list[1][0].y - 2000),
@@ -562,7 +668,7 @@ class COC(object):
             ]
         #MOVE CHUNKS DOWN
         if offset[1] > self.chunks_list[1][0].y + 0.4*2000 - 475:
-            print('getting new chunks')
+            #print('getting new chunks')
             self.chunks_list[0] = self.chunks_list[1]
             self.chunks_list[1] = [
                     Chunk(self.chunks_list[0][0].x, self.chunks_list[0][0].y + 2000),
@@ -570,7 +676,7 @@ class COC(object):
             ]
         #MOVE CHUNKS LEFT
         if offset[0] < self.chunks_list[0][0].x + 0.4*2000 - 775:
-            print('getting new chunks')
+            #print('getting new chunks')
             self.chunks_list[0][1] = self.chunks_list[0][0]
             self.chunks_list[1][1] = self.chunks_list[1][0]
 
@@ -579,7 +685,7 @@ class COC(object):
 
         #MOVE CHUNKS RIGHT
         if offset[0] > self.chunks_list[0][1].x + 0.4*2000 - 775:
-            print('getting new chunks')
+            #print('getting new chunks')
             self.chunks_list[0][0] = self.chunks_list[0][1]
             self.chunks_list[1][0] = self.chunks_list[1][1]
 
@@ -600,21 +706,8 @@ class COC(object):
             all_obstacles.append(obs)
         return all_obstacles
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    def get_all_npcs(self):
+        return self.chunks_list[0][0].npcs_list + self.chunks_list[0][1].npcs_list + self.chunks_list[1][0].npcs_list + self.chunks_list[1][1].npcs_list
 
 
 
@@ -647,9 +740,33 @@ obstacles = [
         ]
 
 #list of all quests the player has to do
+
+quest_tiers = [
+
+    [
+    Quest(translate('Give water to the yellow knight.'), 'water_bucket.png', 'knight.png', item_water_bucket),
+    Quest(translate('Give a gold coin to the red knight.'), 'gold_coin.png', 'enemy_knight.png', item_gold_coin),
+    Quest(translate('Give a key to the yellow knight.'), 'key.png', 'knight.png', item_key),
+    Quest(translate('Give a gold bar to the red knight'), 'gold_bar.png', 'knight.png', item_gold_bar)
+    ],
+    [
+    Quest(translate('The yellow knight wants to be rich.'), 'gold_bar.png', 'knight.png', item_gold_bar),
+    Quest(translate('Take a scroll to the red knight.'), 'scroll.png', 'enemy_knight.png', item_scroll),
+    Quest(translate('Bring yellow knight a shiny key'), 'key.png', 'knight.png', item_key),
+    Quest(translate('Red knight needs a gold bar'), 'gold_bar.png', 'knight.png', item_gold_bar)
+    ],
+    [
+    Quest(translate('Yellow knight is rich. Red knight is poor.'), 'gold_coin.png', 'enemy_knight.png', item_gold_coin),
+    Quest(translate('Red knight has seen a fire!'), 'water_bucket.png', 'enemy_knight.png', item_water_bucket),
+    Quest(translate('The yellow knight cannot get in to his house!'), 'key.png', 'knight.png', item_key),
+    Quest(translate('Red knight has been robbed! His gold bar is missing!'), 'gold_bar.png', 'knight.png', item_gold_bar)
+    ]
+
+]
+
 questList = [
-        Quest(translate('Give water to the yellow knight'), 'water_bucket.png', 'knight.png', item_water_bucket),
-        Quest(translate('Give a gold coin to the red knight'), 'gold_coin.png', 'enemy_knight.png', item_gold_coin)
+        Quest(translate('Give water to the yellow knight'), 'water_bucket.png', 'enemy_knight.png', item_water_bucket),
+        Quest(translate('Give a gold coin to the red knight'), 'gold_coin.png', 'knight.png', item_gold_coin)
         ]
 #General Images
 inventory_hover = pygame.image.load('inv_hover.png').convert_alpha()
@@ -719,6 +836,21 @@ pygame.mixer.init()
 deathSound = pygame.mixer.Sound('SFX_Dead.wav')
 miscSound1 = pygame.mixer.Sound('SFX_Misc.wav')
 
+#SPRITES
+global knight_sprites
+global currentSprite
+knight_spritesheet = pygame.image.load('knight2.png').convert_alpha()
+knight_spritelist = [[0, 0, 20, 20], [-21, 0, 20, 20], [-42, 0, 20, 20], [-63, 0, 20, 20], [0, -21, 20, 20], [-21, -21, 20, 20], [-42, -21, 20, 20], [-63, -21, 20, 20], [0, -42, 20, 20]]
+knight_sprites = []
+for sprite in knight_spritelist:
+    surf = pygame.Surface((sprite[2], sprite[3]), pygame.SRCALPHA)
+    surf.blit(knight_spritesheet.convert_alpha(), (sprite[0], sprite[1]))
+    knight_sprites.append(surf)
+movementInterval = 0.45
+movetime = time.time()
+still = False
+direction = 'down'
+lastpressed = None
 
 # questList.append(Quest('Find a key from the king', 'key.png', npcs[0], item_water_bucket))
 # questList.append(Quest('Get the scroll from a knight', 'scroll.png', npcs[0], item_water_bucket))
@@ -743,14 +875,25 @@ BROWN = (172, 113, 79)
 
 
 def updateMobs():
-        mob.move()
+        for mob in mobs:
+            mob.move()
+            if CheckDistance((hero.x, hero.y), (mob.x, mob.y)) > 2000:
+                mobs.remove(mob)
+                mobs.append(Mob('goblin.png', hero.x + np.random.choice([-1,1],1)[0]*np.random.randint(50,150), hero.y + np.random.choice([-1,1],1)[0]*np.random.randint(50,150), "Buckethead 2"))
         drawMobs()
 
 def drawMobs():
-        window.blit(mob.image, (int(mob.x), int(mob.y)))
+        for mob in mobs:
+            window.blit(mob.image, (int(mob.x), int(mob.y)))
 
 def drawPlayer():
-        window.blit(hero.image, (hero.x, hero.y))
+        global currentSprite
+        global knight_sprites
+        currentSprite = knight_sprites[currentSprite]
+        tempsurf = pygame.transform.scale(currentSprite, (50, 50))
+        if flip == True:
+            tempsurf = pygame.transform.flip(tempsurf, True, False)
+        window.blit(tempsurf, (hero.x, hero.y))
 
 def drawObstacles():
         for obs in obstacles:
@@ -782,17 +925,23 @@ def drawInventory():
 def checkInteraction():
         global interactable
         interactable = False
-        for guy in npcs:
-                if (abs(hero.x - guy.x) < 40 and (hero.y - guy.y < 35) and (hero.y - guy.y > 0)) or (abs(hero.x - guy.x) < 40 and (guy.y - hero.y < 50) and (guy.y - hero.y > 0)) or (hero.x - guy.x < 50 and hero.x - guy.x > 0 and (((hero.y - guy.y < 25) and (hero.y - guy.y > 0)) or (guy.y - hero.y < 45) and (guy.y - hero.y > 0))) or guy.x - hero.x < 50 and guy.x - hero.x > 0 and (((hero.y - guy.y < 25) and (hero.y - guy.y > 0)) or (guy.y - hero.y < 45) and (guy.y - hero.y > 0)):
+        for guy in world.get_all_npcs():
+                # print(guy.x, guy.y, [hero.x-offset[0], hero.y-offset[1]], CheckDistance([guy.x, guy.y], [hero.x-offset[0], hero.y-offset[1]]))
+                if CheckDistance([guy.x, guy.y], [hero.x-offset[0], hero.y-offset[1]]) < 50:
+                # if (abs((hero.x-offset[0]) - guy.x) < 40 and ((hero.y-offset[1]) - guy.y < 35) and ((hero.y-offset[1]) - guy.y > 0)) or (abs((hero.x-offset[0]) - guy.x) < 40 and (guy.y - (hero.y-offset[1]) < 50) and (guy.y - (hero.y-offset[1]) > 0)) or ((hero.x-offset[0]) - guy.x < 50 and (hero.x-offset[0]) - guy.x > 0 and ((((hero.y-offset[1]) - guy.y < 25) and ((hero.y-offset[1]) - guy.y > 0)) or (guy.y - (hero.y-offset[1]) < 45) and (guy.y - (hero.y-offset[1]) > 0))) or guy.x - (hero.x-offset[0]) < 50 and guy.x - (hero.x-offset[0]) > 0 and ((((hero.y-offset[1]) - guy.y < 25) and ((hero.y-offset[1]) - guy.y > 0)) or (guy.y - hero.y < 45) and (guy.y - hero.y > 0)):
                         interactable = True
                         # try to give the npc an item
                         for thing in inventoryList:
                                 if len(questList) > 0 and thing.name == questList[current_quest].target_item.name and guy.image_name == questList[current_quest].target_npc:
                                         guy.complete_quest()
+                                        pinMessage(guy.message_3)
                                         inventoryList.remove(thing)
                                         hero.add_xp(75)
                                         # auto-switch to next quest
                                         questList.remove(questList[current_quest])
+                                        print(hero.level)
+                                        questList.append(quest_tiers[min(2,hero.level-1)][np.random.choice([0,1],1)[0]])
+
                                         break
                         break
                         #drawMessage()
@@ -813,7 +962,7 @@ def pinMessage(message):
         global message_text
         global pin_time
 
-        message_text = message
+        message_text = translate(message)
         pin_time = 4
 
 def drawPinnedMessage():
@@ -921,9 +1070,10 @@ def move(direction):
                                 obs.y += hero.vel
                         for guy in npcs:
                                 guy.y += hero.vel
-                        mob.y += hero.vel
-                        if mob.goal is not None:
-                            mob.goal[1] += hero.vel
+                        for mob in mobs:
+                            mob.y += hero.vel
+                            if mob.goal is not None:
+                                mob.goal[1] += hero.vel
         if direction == 'down':
                 for obs in obstacles:
                         if abs(hero.x - obs.x) < 40 and (obs.y - hero.y < 50) and (obs.y - hero.y > 0) and obs.collidable:
@@ -942,9 +1092,10 @@ def move(direction):
                                 obs.y -= hero.vel
                         for guy in npcs:
                                 guy.y -= hero.vel
-                        mob.y -= hero.vel
-                        if mob.goal is not None:
-                            mob.goal[1] -= hero.vel
+                        for mob in mobs:
+                            mob.y -= hero.vel
+                            if mob.goal is not None:
+                                mob.goal[1] -= hero.vel
         if direction == 'left':
                 for obs in obstacles:
                         if hero.x - obs.x < 50 and hero.x - obs.x > 0 and (((hero.y - obs.y < 25) and (hero.y - obs.y > 0)) or (obs.y - hero.y < 45) and (obs.y - hero.y > 0)) and obs.collidable:
@@ -963,9 +1114,10 @@ def move(direction):
                                 obs.x += hero.vel
                         for guy in npcs:
                                 guy.x += hero.vel
-                        mob.x += hero.vel
-                        if mob.goal is not None:
-                            mob.goal[0] += hero.vel
+                        for mob in mobs:
+                            mob.x += hero.vel
+                            if mob.goal is not None:
+                                mob.goal[0] += hero.vel
         if direction == 'right':
                 for obs in obstacles:
                         if obs.x - hero.x < 50 and obs.x - hero.x > 0 and (((hero.y - obs.y < 25) and (hero.y - obs.y > 0)) or (obs.y - hero.y < 45) and (obs.y - hero.y > 0)) and obs.collidable:
@@ -984,9 +1136,10 @@ def move(direction):
                                 obs.x -= hero.vel
                         for guy in npcs:
                                 guy.x -= hero.vel
-                        mob.x -= hero.vel
-                        if mob.goal is not None:
-                            mob.goal[0] -= hero.vel
+                        for mob in mobs:
+                            mob.x -= hero.vel
+                            if mob.goal is not None:
+                                mob.goal[0] -= hero.vel
 
 def CheckDistance(pos1, pos2):
         distance = ((pos1[0] - pos2[0])**2 + (pos2[1] - pos1[1])**2)**0.5
@@ -1190,16 +1343,39 @@ while run:
         escapeHeld = keys[pygame.K_ESCAPE]
 
         #directional input
+        if time.time() > movetime + (movementInterval * 2):
+                movetime = time.time()
+        flip = False
         if (keys[pygame.K_UP] or keys[pygame.K_w]) and not inventory_open:
+                direction = 'up'
+                if lastpressed != 'up':
+                    movetime = time.time()
+                lastpressed ='up'
+                still = False
                 move('up')
                 interactable = False
         if (keys[pygame.K_DOWN] or keys[pygame.K_s]) and not inventory_open:
+                direction = 'down'
+                if lastpressed != 'down':
+                    movetime = time.time()
+                lastpressed = 'down'
+                still = False
                 move('down')
                 interactable = False
         if (keys[pygame.K_LEFT] or keys[pygame.K_a]) and not inventory_open:
+                direction = 'left'
+                if lastpressed != 'left':
+                    movetime = time.time()
+                lastpressed = 'left'
+                still = False
                 move('left')
                 interactable = False
         if (keys[pygame.K_RIGHT] or keys[pygame.K_d]) and not inventory_open:
+                direction = 'right'
+                if lastpressed != 'right':
+                    movetime = time.time()
+                lastpressed = 'right'
+                still = False
                 move('right')
                 interactable = False
         if keys[pygame.K_RETURN] and not inventory_open and not interactable and not return_held:
@@ -1207,7 +1383,45 @@ while run:
                 checkInteraction()
         if keys[pygame.K_RETURN] and not inventory_open and not return_held:
                 interactable = False
-
+        #for SPRITES
+        if (keys[pygame.K_UP] or keys[pygame.K_RIGHT] or keys[pygame.K_DOWN] or keys[pygame.K_LEFT] or keys[pygame.K_w] or keys[pygame.K_d] or keys[pygame.K_s] or keys[pygame.K_a]) == False:
+            still = True
+            lastpressed = None
+        else:
+            still = False
+        if still == True:
+            if direction == 'up':
+                currentSprite = 0
+            elif direction == 'right':
+                currentSprite = 6
+            elif direction == 'down':
+                currentSprite = 3
+            elif direction == 'left':
+                currentSprite = 6
+                flip = True
+        else:
+            if direction == 'up':
+                if time.time() > movetime + movementInterval:
+                    currentSprite = 1
+                else:
+                    currentSprite = 2
+            elif direction == 'right':
+                if time.time() > movetime + movementInterval:
+                    currentSprite = 7
+                else:
+                    currentSprite = 8
+            elif direction == 'down':
+                if time.time() > movetime + movementInterval:
+                    currentSprite = 4
+                else:
+                    currentSprite = 5
+            elif direction == 'left':
+                if time.time() > movetime + movementInterval:
+                    currentSprite = 7
+                    flip = True
+                else:
+                    currentSprite = 8
+                    flip = True
         return_held = keys[pygame.K_RETURN]
 
         #inventory input
@@ -1228,7 +1442,7 @@ while run:
         drawPinnedMessage()
         updateDelays()
 
-        #If goint to pause next frame, don't draw UI elements
+        #If going to pause next frame, don't draw UI elements
         if BEGINPAUSE == False:
                 drawStatsUI()
                 drawQuest()
